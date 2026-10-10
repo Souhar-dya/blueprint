@@ -15,3 +15,5 @@ coverage
 
 # Local smoke-test screenshots
 artifacts/
+
+.env*
