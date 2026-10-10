@@ -1,16 +1,67 @@
 import Link from "next/link";
 
+const PREVIEW_NODE_WIDTH = 150;
+const PREVIEW_NODE_HEIGHT = 64;
+
+type PreviewNode = {
+  id: string;
+  label: string;
+  sub: string;
+  dot: string;
+  x: number;
+  y: number;
+};
+
+// Everything lives in one fixed 640x340 viewBox. Because the wires are drawn
+// from each card's centre in the same coordinate space, they always attach to
+// the boxes — regardless of how the preview is scaled. (The old version placed
+// nodes with percentages but hard-coded pixel wire offsets, so the lines
+// floated between the boxes.)
+const previewNodes: PreviewNode[] = [
+  { id: "gateway", label: "API Gateway", sub: "edge / ingress", dot: "var(--lime)", x: 18, y: 138 },
+  { id: "auth", label: "Auth Service", sub: "stateless compute", dot: "var(--cyan)", x: 250, y: 30 },
+  { id: "redis", label: "Redis Cache", sub: "low latency", dot: "var(--lime)", x: 250, y: 138 },
+  { id: "worker", label: "Worker Pool", sub: "async jobs", dot: "var(--cyan)", x: 250, y: 246 },
+  { id: "postgres", label: "PostgreSQL", sub: "primary store", dot: "var(--orange)", x: 470, y: 138 },
+];
+
+const previewEdges: Array<[string, string]> = [
+  ["gateway", "auth"],
+  ["gateway", "redis"],
+  ["gateway", "worker"],
+  ["auth", "postgres"],
+  ["worker", "postgres"],
+];
+
 function ArchitecturePreview() {
+  const centers = new Map(
+    previewNodes.map((node) => [
+      node.id,
+      { cx: node.x + PREVIEW_NODE_WIDTH / 2, cy: node.y + PREVIEW_NODE_HEIGHT / 2 },
+    ]),
+  );
   return (
     <div className="preview" aria-label="Architecture preview">
       <div className="preview-header"><span>untitled / architecture</span><span className="status">● live canvas</span></div>
       <div className="diagram" aria-hidden="true">
-        <div className="wire wire-one" /><div className="wire wire-two" /><div className="wire wire-three" /><div className="wire wire-four" />
-        <div className="node node-a"><i className="dot lime" /><strong>API Gateway</strong><span>edge / ingress</span></div>
-        <div className="node node-b"><i className="dot" /><strong>Auth Service</strong><span>stateless compute</span></div>
-        <div className="node node-c"><i className="dot orange" /><strong>PostgreSQL</strong><span>primary store</span></div>
-        <div className="node node-d"><i className="dot lime" /><strong>Redis Cache</strong><span>low latency</span></div>
-        <div className="node node-e"><i className="dot" /><strong>Worker Pool</strong><span>async jobs</span></div>
+        <svg className="diagram-svg" viewBox="0 0 640 340" preserveAspectRatio="xMidYMid meet" focusable="false">
+          <g>
+            {previewEdges.map(([from, to]) => {
+              const start = centers.get(from);
+              const end = centers.get(to);
+              if (!start || !end) return null;
+              return <line key={`${from}-${to}`} className="dedge" x1={start.cx} y1={start.cy} x2={end.cx} y2={end.cy} />;
+            })}
+          </g>
+          {previewNodes.map((node) => (
+            <g key={node.id}>
+              <rect className="dnode-card" x={node.x} y={node.y} width={PREVIEW_NODE_WIDTH} height={PREVIEW_NODE_HEIGHT} rx="8" />
+              <circle cx={node.x + 16} cy={node.y + 18} r="3.5" fill={node.dot} />
+              <text className="dnode-label" x={node.x + 14} y={node.y + 41}>{node.label}</text>
+              <text className="dnode-sub" x={node.x + 14} y={node.y + 56}>{node.sub}</text>
+            </g>
+          ))}
+        </svg>
       </div>
     </div>
   );
