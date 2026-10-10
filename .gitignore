@@ -1,0 +1,17 @@
+node_modules
+.next
+out
+.env
+.env.local
+.env.*.local
+.vercel
+*.tsbuildinfo
+*.log
+coverage
+.neon
+
+# NOTE: deliberately NOT ignoring *.mp3 / *.png — demo/audio assets must be
+# committed for this repository.
+
+# Local smoke-test screenshots
+artifacts/
