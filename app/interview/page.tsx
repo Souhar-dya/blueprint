@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, PointerEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ARCHITECTURE_PROVIDERS, ARCHITECTURE_TYPES, architectureProviderLabel, architectureTypeLabel, connectionRuleError, inferArchitectureType, type ArchitectureNode, type ArchitectureState, type ArchitectureType, type ArchitectureZone } from "../../lib/architecture";
 import { validateArchitecture } from "../../lib/architecture-validator";
 import { applyInterviewTurn, applyObservationTurn, createInterviewState, interviewPhases, type InterviewState, type InterviewTurn } from "../../lib/interview";
@@ -870,7 +870,14 @@ export default function InterviewPage() {
     const maxX = Math.max(...xs) + 140;
     const minY = Math.min(...ys) - 120;
     const maxY = Math.max(...ys) + 120;
-    const zoom = clamp(Math.min(rect.width / (maxX - minX), rect.height / (maxY - minY)), MIN_ZOOM, 1.4);
+    // On a phone the canvas is narrow, so a pure "fit everything" zoom shrinks
+    // the nodes below a comfortable tap target. Floor the starting zoom when the
+    // pointer is coarse or the canvas is phone-sized, and let the user pan.
+    const touchFloor =
+      typeof window !== "undefined" && (window.matchMedia("(pointer: coarse)").matches || rect.width < 720)
+        ? 0.6
+        : MIN_ZOOM;
+    const zoom = clamp(Math.min(rect.width / (maxX - minX), rect.height / (maxY - minY)), touchFloor, 1.4);
     setView({ zoom, x: rect.width / 2 - zoom * ((minX + maxX) / 2), y: rect.height / 2 - zoom * ((minY + maxY) / 2) });
   }, []);
 
@@ -1225,14 +1232,14 @@ export default function InterviewPage() {
   // interview is a deliberate browser-level action, not a canvas button.
 
   return <main className="shell">
-    <nav className="nav nav-workspace" style={{ background: "var(--canvas)", borderBottom: "1px solid var(--line)" }}><Link href="/" className="brand"><span className="brand-mark">B</span> blueprint</Link><div className="nav-links"><span style={{ color: "var(--muted)" }}>{scenarioName} / {interviewState.difficulty}</span><span className="status">● Interview live</span></div></nav>
+    <nav className="nav nav-workspace" style={{ background: "var(--canvas)", borderBottom: "1px solid var(--line)" }}><Link href="/" className="brand"><span className="brand-mark">B</span> blueprint</Link><div className="nav-links"><span className="nav-workspace-scenario" style={{ color: "var(--muted)" }}>{scenarioName} / {interviewState.difficulty}</span><span className="status">● Interview live</span></div></nav>
     <div className="interview-layout">
       <section className="canvas-panel">
         <div className="workspace-header"><div><div className="eyebrow">Phase {String(Math.max(1, interviewPhases.indexOf(interviewState.phase) + 1)).padStart(2, "0")} / {interviewState.phase.replaceAll("_", " ")}</div><h1 className="workspace-title">{scenarioName} <span className="save-indicator">{saved ? "saved locally" : `${architecture.nodes.length} nodes · ${architecture.edges.length} edges`}</span></h1></div><span className="conversation-mode">{interviewState.conversationMode || "discussion"} / live</span></div>
         <div className="ai-workspace-actions"><span className="ai-orb" aria-hidden="true">✦</span><span><strong>Architecture tools</strong><small>Add components, connect them on the canvas, and manage your architecture backup.</small></span><div className="ai-action-menu"><button className="tool-button" onClick={() => setAddServiceOpen((open) => !open)}>＋ Add service</button>{addServiceOpen && <div className="add-service-form"><input autoFocus value={newServiceName} onChange={(event) => setNewServiceName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addService(); } }} placeholder="Name it — Kafka, Cassandra, message queue…" aria-label="New service name" /><select value={newServiceType} onChange={(event) => setNewServiceType(event.target.value as ArchitectureType | "auto")} aria-label="New service type"><option value="auto">Auto-detect type</option>{ARCHITECTURE_TYPES.map((type) => <option key={type} value={type}>{architectureTypeLabel(type)}</option>)}</select><button className="primary-button" onClick={addService} disabled={!newServiceName.trim()}>Add ↗</button></div>}<button className="tool-button" onClick={() => { if (selected) deleteNode(selected); }} disabled={!selected} title="Delete the selected component">Delete component</button><button className="tool-button" onClick={() => { if (selectedEdge) deleteEdge(selectedEdge); }} disabled={!selectedEdge} title="Delete the selected wire connection">Delete connection</button><button className="tool-button" onClick={exportArchitecture}>Export JSON</button><label className="file-button tool-button">Import JSON<input type="file" accept="application/json,.json" onChange={importArchitecture} /></label>{storageMessage && <span role="status">{storageMessage}</span>}</div></div>
         {connectionError ? <p className="canvas-hint canvas-error" role="alert">✕ {connectionError}</p> : <p className="canvas-hint">Drag empty space to pan · scroll or pinch to zoom · drag a port ○ onto another component to connect · the interviewer notices every change you make.</p>}
         <div ref={canvasRef} className="architecture-canvas" role="application" aria-label="Architecture design canvas. Drag empty space to pan, scroll or pinch to zoom, drag a port onto another component to connect, and drag components to move them." onPointerDown={handleCanvasPointerDown} onPointerMove={handleCanvasPointerMove} onPointerUp={handleCanvasPointerUp} onPointerLeave={handleCanvasPointerUp} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-          <div className="canvas-world" style={{ width: WORLD_WIDTH, height: WORLD_HEIGHT, transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
+          <div className="canvas-world" style={{ width: WORLD_WIDTH, height: WORLD_HEIGHT, transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, "--zoom": String(view.zoom) } as CSSProperties}>
             {(architecture.zones || []).map((zone) => <div key={zone.id} className={`canvas-zone ${selectedZone === zone.id ? "zone-selected" : ""}`} style={{ left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.width}%`, height: `${zone.height}%` }}>
               <div className="canvas-zone-header" onPointerDown={(event) => handleZoneHeaderPointerDown(event, zone)}>
                 <span className="canvas-zone-label" onDoubleClick={() => setEditingZoneId(zone.id)}>{zone.label}</span>

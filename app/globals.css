@@ -106,13 +106,13 @@ h2 { font-size: 38px; letter-spacing: -.06em; margin: 12px 0 0; }.section-title 
 .interview-sidebar { padding:30px 26px; background:linear-gradient(180deg,rgba(17,24,22,.98),rgba(11,16,15,.98)); }.interviewer-question { font-size:17px; line-height:1.6; margin:24px 0 0; letter-spacing:-.02em; }.voice-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:18px 0 20px; }.voice-note { color:var(--muted); font-size:12px; }.editor-textarea,.editor-input { width:100%; background:var(--canvas); color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:12px; margin-top:8px; font:inherit; }.editor-textarea { min-height:100px; resize:vertical; }.answer-box { min-height:140px; }.small-textarea { min-height:68px; }.full-button { width:100%; margin-top:10px; }.inspector { border-top:1px solid var(--line); margin-top:34px; padding-top:26px; }.inspector-title { display:flex; justify-content:space-between; align-items:center; margin:10px 0 18px; }.inspector-title h3 { margin:0; }.icon-button { background:transparent; border:1px solid var(--line); color:var(--muted); border-radius:6px; cursor:pointer; margin-left:5px; width:44px; height:44px; }.icon-button:hover { color:var(--ink); border-color:var(--lime); }.icon-button.danger:hover { color:var(--danger); border-color:var(--danger); }.field-label { color:var(--muted); font-size:12px; display:block; margin-top:14px; }.editor-row { display:flex; gap:10px; }.editor-row > div { flex:1; min-width:0; }
 .conversation-input { border:1px solid var(--line); border-radius:8px; padding:14px; background:var(--canvas); }.voice-transcript { min-height:58px; color:var(--muted); font-size:13px; line-height:1.5; }.talk-button { width:100%; min-height:52px; margin-top:12px; border:1px solid var(--lime); border-radius:6px; background:rgba(190,239,90,.08); color:var(--ink); cursor:pointer; font-weight:600; }.talk-button:hover,.talking { background:var(--lime); color:#111; }
 .finding-list { border-top:1px solid var(--line); margin-top:26px; padding-top:22px; }.finding { display:flex; gap:9px; padding:12px 0; border-bottom:1px solid rgba(141,153,148,.12); }.finding strong { font-size:12px; }.finding p { color:var(--muted); font-size:11px; line-height:1.45; margin:4px 0 0; }.finding-dot { width:7px; height:7px; flex:none; margin-top:4px; border-radius:50%; background:var(--cyan); }.finding-dot.error { background:#ff8d8d; }.finding-dot.warning { background:var(--orange); }
-@media (max-width: 800px) { .nav-links a { display:none; }.hero { grid-template-columns:1fr; padding-top:70px; gap:45px; }.preview { min-height:350px; }.steps { grid-template-columns:1fr; }.section-title { display:block; }.section-title p { margin-top:15px; } h1 { font-size:54px; } }
+@media (max-width: 800px) { .nav-links a { display:none; }.hero { grid-template-columns:1fr; padding-top:70px; gap:45px; }.preview { min-height:350px; }.steps { grid-template-columns:1fr; }.section-title { display:block; }.section-title p { margin-top:15px; } h1 { font-size:clamp(38px,10vw,54px); } }
 @media (max-width: 950px) { .scenario-grid { grid-template-columns:repeat(2,1fr); }.custom-form { grid-template-columns:1fr 1fr; } }
 @media (max-width: 600px) { .scenario-grid,.custom-form,.scenario-picker { grid-template-columns:1fr; }.scenario-picker label { grid-column:auto; } }
 @media (max-width: 850px) { .interview-layout { grid-template-columns:1fr; }.interview-sidebar { border-top:1px solid var(--line); }.canvas-panel { padding:16px; }.workspace-header { align-items:flex-start; flex-direction:column; }.architecture-canvas { min-height:460px; } }
-@media (max-width: 760px) { .auth-layout { width:min(100% - 36px,520px); display:block; padding:48px 0 70px; }.auth-intro { padding:0 0 38px; }.auth-intro h1 { font-size:54px; }.auth-proof { margin-top:30px; }.auth-card { padding:25px 21px; }.nav-back { font-size:10px; } }
+@media (max-width: 760px) { .auth-layout { width:min(100% - 36px,520px); display:block; padding:48px 0 70px; }.auth-intro { padding:0 0 38px; }.auth-intro h1 { font-size:clamp(36px,10vw,54px); }.auth-proof { margin-top:30px; }.auth-card { padding:25px 21px; }.nav-back { font-size:10px; } }
 @media (max-width: 900px) { .monitoring-heading { align-items:flex-start; flex-direction:column; }.monitor-grid { grid-template-columns:repeat(2,1fr); }.monitoring-refresh { margin-top:4px; } }
-@media (max-width: 600px) { .monitor-nav { gap:10px; }.monitor-live { display:none; }.monitoring-wrap { padding:48px 18px 72px; }.monitoring-heading { padding-bottom:32px; }.monitoring-heading h1 { font-size:54px; }.monitor-grid { grid-template-columns:1fr; }.monitor-card { min-height:190px; }.metric-number { margin-top:34px; } }
+@media (max-width: 600px) { .monitor-nav { gap:10px; }.monitor-live { display:none; }.monitoring-wrap { padding:48px 18px 72px; }.monitoring-heading { padding-bottom:32px; }.monitoring-heading h1 { font-size:clamp(34px,11vw,46px); }.monitor-grid { grid-template-columns:1fr; }.monitor-card { min-height:190px; }.metric-number { margin-top:34px; } }
 @media (max-width: 600px) { .consent-banner { right:16px; bottom:16px; flex-direction:column; align-items:stretch; }.consent-actions { flex-direction:row; }.consent-actions > * { flex:1; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior:auto !important; transition-duration:0.01ms !important; animation-duration:0.01ms !important; animation-iteration-count:1 !important; } }
 .ai-workspace-actions{display:flex;align-items:center;gap:12px;margin:14px 0;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025)}
@@ -296,3 +296,114 @@ h2 { font-size: 38px; letter-spacing: -.06em; margin: 12px 0 0; }.section-title 
 .node-actions .node-action-delete{color:#ff9d9d;border-color:rgba(255,110,110,.35)}
 .node-actions .node-action-delete:hover{color:#ffd0d0;border-color:rgba(255,110,110,.7);background:rgba(255,110,110,.12)}
 @media (max-width:700px){.ai-workspace-actions{flex-wrap:wrap}.ai-workspace-actions>.ai-action-menu{flex-basis:100%}}
+
+/* ============================================================================
+   Adaptation pass — phones (portrait + landscape), tablets, large desktops.
+   The incumbent dark world (lime/cyan, DM Mono, Manrope, tight display type)
+   is preserved; only how it responds to the device changes.
+   ========================================================================== */
+
+/* Native surfaces belong to the committed dark world: dark scrollbars, dark
+   select popups, dark focus rings on form controls. */
+:root { color-scheme: dark; }
+
+/* Keep long unbroken display words ("monitoring", "PostgreSQL") from being
+   clipped by .shell{overflow:hidden} at the narrowest widths. */
+h1, h2, h3 { overflow-wrap: break-word; }
+
+/* Fixed-width page titles used by FAQ / contact / resources / legal / 404.
+   These replace the old inline fontSize:62|68 that ignored every breakpoint. */
+.page-title { font-size: clamp(38px, 9vw, 62px); }
+.page-title-lg { font-size: clamp(40px, 10vw, 68px); }
+
+/* FAQ: two answer columns on desktop, one on phones. The previous inline
+   gridTemplateColumns always beat the media query, so the grid clipped. */
+.faq-grid { grid-template-columns: 1fr 1fr; }
+@media (max-width: 720px) { .faq-grid { grid-template-columns: 1fr; } }
+
+/* Latency table keeps five readable columns and scrolls horizontally on
+   phones rather than crushing them. */
+.monitor-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.monitor-table-scroll .monitor-table { min-width: 520px; }
+
+/* Rows that were pinned to a single line and overflowed at ~320px. */
+.hero-actions { flex-wrap: wrap; }
+.monitor-row { flex-wrap: wrap; }
+
+/* --- Mobile navigation disclosure -----------------------------------------
+   Replaces the old rule that hid every nav link (including the primary CTA)
+   below 800px with nothing in its place. */
+.nav-menu { display: none; }
+.nav-menu-toggle { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 13px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); cursor: pointer; font: 500 12px "DM Mono", monospace; letter-spacing: .06em; text-transform: uppercase; list-style: none; }
+.nav-menu-toggle::-webkit-details-marker { display: none; }
+.nav-menu-toggle:hover { border-color: var(--lime); }
+.nav-menu-icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.nav-menu[open] .nav-menu-toggle { border-color: var(--lime); color: var(--lime); }
+.nav-menu-panel { position: absolute; top: calc(100% + 10px); right: 0; left: 0; z-index: 40; display: grid; gap: 4px; max-height: calc(100vh - 110px); overflow-y: auto; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-strong); box-shadow: 0 24px 60px #000b; }
+.nav-menu-link, .nav-menu-cta { display: flex; align-items: center; min-height: 48px; padding: 0 14px; border-radius: 9px; }
+.nav-menu-link { color: var(--ink); font-size: 15px; }
+.nav-menu-link:hover { background: rgba(141,153,148,.08); color: var(--lime); }
+.nav-menu-cta { justify-content: center; background: var(--lime); color: #10160f; font-weight: 800; }
+@media (max-width: 800px) {
+  .nav-with-menu { position: relative; }
+  .nav-with-menu .nav-links { display: none; }
+  .nav-with-menu .nav-menu { display: block; margin-left: auto; }
+}
+
+/* Interview workspace nav: let the brand size to its content so the scenario /
+   difficulty / status text shrinks instead of squashing the logo; on phones the
+   scenario line is redundant (the sidebar already shows it) so it steps aside. */
+@media (max-width: 850px) { .nav-workspace { grid-template-columns: auto minmax(0, 1fr); } }
+@media (max-width: 700px) { .nav-workspace-scenario { display: none; } }
+
+/* --- Safe areas (viewport-fit: cover) ------------------------------------- */
+body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+.skip-link { left: max(16px, env(safe-area-inset-left)); }
+.consent-banner { right: max(24px, env(safe-area-inset-right)); bottom: max(24px, env(safe-area-inset-bottom)); }
+.canvas-controls { right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); }
+
+/* --- Touch ergonomics: enlarge the smallest controls on coarse pointers --- */
+@media (pointer: coarse) {
+  /* Inputs below 16px make iOS Safari zoom the whole page on focus. */
+  .custom-form input, .custom-form textarea, .custom-form select, .scenario-picker select,
+  .monitor-form input, .monitor-form select, .voice-picker, .component-answer,
+  .zone-edit-form input, .zone-edit-form select, .add-service-form input, .add-service-form select,
+  .editor-input, .editor-textarea, .answer-dock input { font-size: 16px; }
+  .monitor-form input, .monitor-form select, .voice-picker, .add-service-form input,
+  .add-service-form select, .zone-edit-form input, .zone-edit-form select { min-height: 44px; }
+
+  /* Canvas chrome lives inside the zoomable world, so its on-screen size is
+     (world size × zoom). Dividing by the live zoom holds a ~44px tap target
+     from a fitted phone view (zoom ~0.6) up to a zoomed-in tablet. */
+  .canvas-control { min-width: 44px; height: 44px; }
+  .node-port { width: clamp(22px, calc(30px / var(--zoom, 1)), 56px); height: clamp(22px, calc(30px / var(--zoom, 1)), 56px); }
+  .node-port-left { left: calc(-9px / var(--zoom, 1)); }
+  .node-port-right { right: calc(-9px / var(--zoom, 1)); }
+  .node-actions button { min-height: clamp(32px, calc(44px / var(--zoom, 1)), 76px); padding: 0 clamp(9px, calc(12px / var(--zoom, 1)), 22px); font-size: clamp(10px, calc(12px / var(--zoom, 1)), 22px); }
+  .node-remove { width: clamp(24px, calc(38px / var(--zoom, 1)), 64px); height: clamp(24px, calc(38px / var(--zoom, 1)), 64px); font-size: clamp(14px, calc(18px / var(--zoom, 1)), 30px); }
+  .zone-header-actions button { width: clamp(24px, calc(38px / var(--zoom, 1)), 64px); height: clamp(24px, calc(38px / var(--zoom, 1)), 64px); font-size: clamp(12px, calc(16px / var(--zoom, 1)), 26px); }
+  .canvas-zone-resize { width: calc(22px / var(--zoom, 1)); height: calc(22px / var(--zoom, 1)); }
+  .popover-close { width: 40px; height: 40px; }
+  .component-popover .primary-button { padding: 12px 16px; font-size: 13px; }
+
+  /* Text-only nav controls get a real hit area without changing their look. */
+  .nav-back, button.auth-switch, .monitor-nav .text-link { display: inline-flex; align-items: center; min-height: 44px; }
+  .dock-controls .text-link { padding: 12px 18px; }
+}
+
+/* --- Phones: tighten rhythm and stack rows that should not compete -------- */
+@media (max-width: 600px) {
+  .nav { padding: 0 18px; }
+  .hero { padding: 56px 20px 64px; gap: 40px; }
+  .section { padding: 64px 20px; }
+  .footer { padding: 24px 20px 40px; flex-direction: column; align-items: flex-start; gap: 14px; }
+  .hero-actions { flex-direction: column; align-items: stretch; gap: 14px; }
+  .hero-actions .primary-button, .hero-actions .text-link { text-align: center; }
+  .hero-actions .text-link { align-self: center; }
+  .history-card { flex-direction: column; align-items: stretch; }
+  .history-actions { flex-wrap: wrap; }
+  .transcript-card { padding: 20px; }
+  .consent-banner { right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); }
+  .edit-popover { left: 16px; right: 16px; width: auto; top: auto; bottom: 16px; }
+}
+
