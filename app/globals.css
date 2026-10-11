@@ -42,7 +42,7 @@ h1 { font-size: clamp(48px, 6vw, 82px); line-height: .98; letter-spacing: -.075e
 .text-link { color: var(--ink); font-size: 14px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
 .preview { min-height: 430px; border: 1px solid var(--line); background: var(--panel); border-radius: 12px; position: relative; padding: 18px; box-shadow: 0 28px 80px rgba(0,0,0,.24); }
 .preview-header { display:flex; justify-content:space-between; color:var(--muted); font: 11px "DM Mono", monospace; }
-.status { color: var(--lime); }
+.status { color: var(--lime); white-space: nowrap; }
 .diagram { position: absolute; inset: 65px 25px 25px; background-image: linear-gradient(rgba(141,153,148,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(141,153,148,.08) 1px, transparent 1px); background-size: 34px 34px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; display:inline-block; background:var(--cyan); }
 .dot.lime { background: var(--lime); }.dot.orange { background: var(--orange); }
@@ -120,13 +120,18 @@ h2 { font-size: 38px; letter-spacing: -.06em; margin: 12px 0 0; }.section-title 
 .ai-orb{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;color:var(--lime);background:rgba(191,255,73,.12);font-size:20px}
 .ai-workspace-actions summary{cursor:pointer;color:var(--lime);font-size:13px}.ai-action-menu{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:10px;max-width:620px}
 .caption-label{margin-bottom:8px;color:var(--lime);font-size:11px;letter-spacing:.14em;text-transform:uppercase}.auth-divider{text-align:center;margin:16px 0;color:var(--muted);font-size:12px}
-.interview-layout{display:grid;grid-template-columns:minmax(0,1fr) 420px;min-height:calc(100vh - 77px)}
-.canvas-panel{min-height:calc(100vh - 77px);padding-bottom:30px;border-right:1px solid rgba(141,153,148,.12)}
-.workspace-header{max-width:1320px;margin-left:auto;margin-right:auto}
-.architecture-canvas{min-height:calc(100vh - 245px);max-width:1320px;margin:0 auto}
-.nav-workspace{max-width:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr) 420px;justify-content:stretch}
-.nav-workspace .brand{margin-left:clamp(20px,3vw,44px)}
-.nav-workspace .nav-links{padding:0 24px;justify-content:flex-end}
+/* Desktop two-column interview layout. Scoped to >=851px so the mobile
+   single-column queries below win on phones — an unscoped rule here would
+   otherwise override them (same specificity, later in source). */
+@media (min-width: 851px) {
+  .interview-layout{display:grid;grid-template-columns:minmax(0,1fr) 420px;min-height:calc(100vh - 77px)}
+  .canvas-panel{min-height:calc(100vh - 77px);padding-bottom:30px;border-right:1px solid rgba(141,153,148,.12)}
+  .workspace-header{max-width:1320px;margin-left:auto;margin-right:auto}
+  .architecture-canvas{min-height:calc(100vh - 245px);max-width:1320px;margin:0 auto}
+  .nav-workspace{max-width:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr) 420px;justify-content:stretch}
+  .nav-workspace .brand{margin-left:clamp(20px,3vw,44px)}
+  .nav-workspace .nav-links{padding:0 24px;justify-content:flex-end}
+}
 .node-wrap{position:absolute;transform:translate(-50%,-50%);z-index:3}
 .node-wrap .architecture-node{position:relative;left:auto!important;top:auto!important;transform:none}
 .node-actions{position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);display:flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:8px;background:rgba(17,24,22,.96);box-shadow:0 8px 20px #0008;white-space:nowrap}
@@ -354,7 +359,7 @@ h1, h2, h3 { overflow-wrap: break-word; }
    difficulty / status text shrinks instead of squashing the logo; on phones the
    scenario line is redundant (the sidebar already shows it) so it steps aside. */
 @media (max-width: 850px) { .nav-workspace { grid-template-columns: auto minmax(0, 1fr); } }
-@media (max-width: 700px) { .nav-workspace-scenario { display: none; } }
+@media (max-width: 700px) { .nav-workspace-scenario { display: none; }.nav-workspace .status { display: none; } }
 
 /* --- Safe areas (viewport-fit: cover) ------------------------------------- */
 body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
