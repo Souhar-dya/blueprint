@@ -20,6 +20,11 @@ if (!register.ok()) throw new Error(`Registration failed: ${register.status()} $
 await page.goto(`${base}/interview?scenario=youtube`);
 await page.getByText("Interview live").waitFor({ timeout: 20000 });
 
+// The 40-minute cap surfaces a live countdown in the workspace nav.
+await page.locator(".interview-timer").first().waitFor({ timeout: 10000 });
+const timerText = await page.locator(".interview-timer").first().innerText();
+if (!/left/.test(timerText)) failures.push(`expected a countdown timer, found "${timerText}"`);
+
 // Record one substantive answer so the scorecard has transcript evidence.
 // The text answer box is gone: typed answers now go through the component
 // popover ("Ask AI" on a canvas node), and voice taps stream straight to AI.
@@ -62,6 +67,12 @@ await page.locator("details.level-scale").getByText("Compares alternatives, ties
 // Practice targets are level-calibrated (they reference the next level).
 const improvements = await page.locator(".evaluation-improvements li").allInnerTexts();
 if (!improvements.length) failures.push("expected at least one practice target");
+
+// The end-of-interview review now renders the architecture diagram and the
+// model-authored critique alongside the scorecard.
+await page.locator(".scorecard-diagram img").waitFor({ timeout: 25000 });
+const critiqueText = (await page.locator(".critique-summary").innerText()).trim();
+if (!critiqueText) failures.push("critique summary was empty");
 
 mkdirSync("artifacts", { recursive: true });
 await page.screenshot({ path: "artifacts/scorecard-desktop.png" });

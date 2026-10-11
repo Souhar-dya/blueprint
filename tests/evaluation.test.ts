@@ -176,20 +176,28 @@ describe("buildEvaluationReport", () => {
     { phase: "data_model", score: 0.3, answer: "A database." },
   ];
 
-  it("blends architecture health with answer evidence for the headline score", () => {
+  it("weights answer evidence above architecture health for the headline score", () => {
     const report = buildEvaluationReport({ scenario: "Design YouTube", validation, turns: 3, answers });
-    expect(report.scorecard.overall.score).not.toBeNull();
-    expect(report.score).toBe(Math.round((validation.score + (report.scorecard.overall.score as number)) / 2));
+    const evidence = report.scorecard.overall.score as number;
+    expect(evidence).not.toBeNull();
+    const contentPhases = interviewPhases.filter((phase) => phase !== "final_evaluation");
+    const covered = new Set(answers.map((answer) => answer.phase));
+    const coverageRatio = contentPhases.filter((phase) => covered.has(phase)).length / contentPhases.length;
+    const expected = Math.round((evidence * 0.7 + validation.score * 0.3) * (0.6 + 0.4 * coverageRatio));
+    expect(report.score).toBe(expected);
+    // The stricter weighted metric must not flatter a thin interview the way the
+    // old 50/50 average did.
+    expect(report.score).toBeLessThan(Math.round((validation.score + evidence) / 2));
     expect(report.scorecard.competencies).toHaveLength(5);
     expect(report.rubric.map((entry) => entry.competency)).toEqual(report.scorecard.competencies.map((entry) => entry.name));
     expect(report.rubric.every((entry) => entry.score >= 0 && entry.score <= 4)).toBe(true);
   });
 
-  it("falls back to the participation formula when nothing was assessed", () => {
+  it("gives a bare diagram only a fraction of its architecture health when nothing was assessed", () => {
     const report = buildEvaluationReport({ scenario: "Design YouTube", validation, turns: 3, answers: [] });
-    const conversationScore = Math.min(100, 50 + Math.min(30, 3 * 10) + (validation.valid ? 20 : 0));
-    expect(report.score).toBe(Math.round((validation.score + conversationScore) / 2));
+    expect(report.score).toBe(Math.round(validation.score * 0.4));
     expect(report.rubric.every((entry) => entry.score === 0)).toBe(true);
+    expect(report.critique).toBeUndefined();
   });
 
   it("leads practice targets with the next level anchor for the weakest competency", () => {

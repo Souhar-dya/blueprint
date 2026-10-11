@@ -23,6 +23,7 @@ type LiveSnapshot = {
   difficulty: InterviewState["difficulty"];
   architecture: ArchitectureState;
   state: InterviewState;
+  startedAt?: number;
   savedAt: number;
 };
 
@@ -77,6 +78,20 @@ const NODE_WIDTH = 145;
 const PORTS_PER_SIDE = 3;
 const MIN_ZOOM = 0.35;
 const MAX_ZOOM = 2.5;
+
+// A hard ceiling on interview length. When it is reached the interview ends
+// itself, produces the architecture diagram and closing critique, and opens
+// the scorecard — no candidate can monopolise a session indefinitely.
+const INTERVIEW_MAX_MS = 40 * 60 * 1000;
+const INTERVIEW_WARN_MS = 5 * 60 * 1000;
+
+/** mm:ss remaining, floored at zero. */
+const formatClock = (ms: number): string => {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+};
 
 // Availability-zone boxes are stored as top-left corner plus size, all as
 // percentages of the same world, so they pan and zoom with the nodes.
@@ -200,6 +215,11 @@ export default function InterviewPage() {
   const [componentDraft, setComponentDraft] = useState("");
   const [componentSubmitting, setComponentSubmitting] = useState(false);
   const [evaluationReport, setEvaluationReport] = useState<EvaluationReport | null>(null);
+  const [evaluationDiagram, setEvaluationDiagram] = useState("");
+  const [interviewStartedAt, setInterviewStartedAt] = useState(0);
+  const [remainingMs, setRemainingMs] = useState(INTERVIEW_MAX_MS);
+  const [timeLimitReached, setTimeLimitReached] = useState(false);
+  const interviewStartedAtRef = useRef(0);
   const nextId = useRef(0);
   const nextEdgeId = useRef(0);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -324,11 +344,14 @@ export default function InterviewPage() {
         const snapshot = readSnapshot(runParam);
         if (snapshot && Array.isArray(snapshot.architecture?.nodes) && snapshot.state && Array.isArray(snapshot.state.answers)) {
           const normalized = normalizeArchitecture(snapshot.architecture);
+          const restoredStartedAt = typeof snapshot.startedAt === "number" && snapshot.startedAt > 0 ? snapshot.startedAt : Date.now();
           setRunToken(runParam);
           setScenarioName(snapshot.scenario);
           setArchitecture(normalized);
           setInterviewState(snapshot.state);
           setQuestion(snapshot.state.currentQuestionData?.text || snapshot.state.currentQuestion);
+          interviewStartedAtRef.current = restoredStartedAt;
+          setInterviewStartedAt(restoredStartedAt);
           return;
         }
       }
@@ -337,6 +360,9 @@ export default function InterviewPage() {
       // a single client node — and the interviewer opens with the scenario's
       // own briefing instead of generic text.
       const freshRun = newRunToken();
+      const startedAt = Date.now();
+      interviewStartedAtRef.current = startedAt;
+      setInterviewStartedAt(startedAt);
       const starter = starterArchitectureFor(catalogScenario?.slug || scenarioParam || displayScenario);
       const brief = scenarioBriefFor(catalogScenario?.slug || scenarioParam || displayScenario);
       const freshState = createInterviewState(displayScenario, selectedDifficulty, starter, { opening: brief.opening, description: brief.description });
@@ -345,7 +371,7 @@ export default function InterviewPage() {
       setArchitecture(starter);
       setInterviewState(freshState);
       setQuestion(freshState.currentQuestion);
-      writeSnapshot(freshRun, { scenario: displayScenario, difficulty: selectedDifficulty, architecture: starter, state: freshState });
+      writeSnapshot(freshRun, { scenario: displayScenario, difficulty: selectedDifficulty, architecture: starter, state: freshState, startedAt });
       const url = new URL(window.location.href);
       url.searchParams.set("scenario", catalogScenario?.slug || scenarioParam || displayScenario.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
       url.searchParams.set("difficulty", selectedDifficulty);
@@ -515,7 +541,7 @@ export default function InterviewPage() {
 
   const persistLive = (architectureValue: ArchitectureState, stateValue: InterviewState) => {
     if (!runToken) return;
-    writeSnapshot(runToken, { scenario: scenarioName, difficulty: stateValue.difficulty, architecture: architectureValue, state: stateValue });
+    writeSnapshot(runToken, { scenario: scenarioName, difficulty: stateValue.difficulty, architecture: architectureValue, state: stateValue, startedAt: interviewStartedAtRef.current });
   };
 
   // Canvas-driven interview: when the candidate adds or removes a component or
@@ -1190,11 +1216,61 @@ export default function InterviewPage() {
     }
   };
 
+  // Render the architecture to a PNG for the scorecard. Best-effort: the
+  // scorecard is complete without it, so a failed render is silently ignored.
+  const captureDiagram = async () => {
+    try {
+      setEvaluationDiagram(await architecturePNGDataURL(architecture));
+    } catch {
+      setEvaluationDiagram("");
+    }
+  };
+
   const endInterview = () => {
     setShowEndConfirm(false);
     setShowScorecard(true);
+    void captureDiagram();
     void generateEvaluation();
   };
+
+  // Auto-end at the 40-minute cap: stop capturing (without submitting the
+  // partial answer), silence the interviewer, flag the reason, then produce the
+  // same architecture diagram and evaluation a manual end would.
+  const autoEndInterview = () => {
+    if (interviewEndedRef.current) return;
+    listeningRef.current = false;
+    setIsListening(false);
+    teardownLiveCapture();
+    setVoiceTranscript("");
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current = null;
+    }
+    window.speechSynthesis?.cancel();
+    setTtsSpeaking(false);
+    setTimeLimitReached(true);
+    setStorageMessage("You reached the 40-minute limit — the interview ended automatically and your scorecard is ready.");
+    setShowEndConfirm(false);
+    setShowScorecard(true);
+    void captureDiagram();
+    void generateEvaluation();
+  };
+
+  // Ticking countdown for the visible timer. It also fires the hard cap; the
+  // interviewEndedRef guard keeps it from firing twice.
+  useEffect(() => {
+    if (!interviewStartedAt || interviewEnded) return;
+    const tick = () => {
+      const left = Math.max(0, INTERVIEW_MAX_MS - (Date.now() - interviewStartedAt));
+      setRemainingMs(left);
+      if (left <= 0) autoEndInterview();
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- autoEndInterview is stable for the interview's lifetime
+  }, [interviewStartedAt, interviewEnded]);
 
   // Download the interview as a self-contained HTML document: transcript,
   // architecture diagram, scoring breakdown, and scorecard. It is generated
@@ -1232,7 +1308,7 @@ export default function InterviewPage() {
   // interview is a deliberate browser-level action, not a canvas button.
 
   return <main className="shell">
-    <nav className="nav nav-workspace" style={{ background: "var(--canvas)", borderBottom: "1px solid var(--line)" }}><Link href="/" className="brand"><span className="brand-mark">B</span> blueprint</Link><div className="nav-links"><span className="nav-workspace-scenario" style={{ color: "var(--muted)" }}>{scenarioName} / {interviewState.difficulty}</span><span className="status">● Interview live</span></div></nav>
+    <nav className="nav nav-workspace" style={{ background: "var(--canvas)", borderBottom: "1px solid var(--line)" }}><Link href="/" className="brand"><span className="brand-mark">B</span> blueprint</Link><div className="nav-links"><span className="nav-workspace-scenario" style={{ color: "var(--muted)" }}>{scenarioName} / {interviewState.difficulty}</span>{interviewStartedAt > 0 && (interviewEnded ? <span className="interview-timer interview-timer-done" title="Interview time is up">time up</span> : <span className={`interview-timer ${remainingMs <= INTERVIEW_WARN_MS ? "interview-timer-low" : ""}`} title="Time remaining in this interview">{formatClock(remainingMs)} left</span>)}<span className="status">● Interview live</span></div></nav>
     <div className="interview-layout">
       <section className="canvas-panel">
         <div className="workspace-header"><div><div className="eyebrow">Phase {String(Math.max(1, interviewPhases.indexOf(interviewState.phase) + 1)).padStart(2, "0")} / {interviewState.phase.replaceAll("_", " ")}</div><h1 className="workspace-title">{scenarioName} <span className="save-indicator">{saved ? "saved locally" : `${architecture.nodes.length} nodes · ${architecture.edges.length} edges`}</span></h1></div><span className="conversation-mode">{interviewState.conversationMode || "discussion"} / live</span></div>
@@ -1285,11 +1361,13 @@ export default function InterviewPage() {
           </select></div>
           <div className="voice-dock">
             <button className={`voice-talk ${isListening ? "talking" : ""}`} onClick={isListening ? () => void stopListening() : () => void startListening()} disabled={isSubmittingTurn || isTranscribing || interviewEnded} aria-label={isListening ? "Stop listening and send your answer" : "Start speaking with the interviewer"}>{isListening ? <><span aria-hidden="true">■</span> Stop — send answer</> : isTranscribing ? "Transcribing…" : <><span aria-hidden="true">◉</span> Answer by voice</>}</button>
-            <span className="voice-hint">{micStatus || (interviewEnded ? "The interview has ended — open your scorecard to review it." : isListening ? "Speak naturally — every word is captioned live below." : micPermission === "granted" ? "Tap to answer by voice — it transcribes on your device, free and offline after the first use." : "Voice needs one-time browser permission; tap the mic and allow it.")}</span>
+            <span className="voice-hint">{timeLimitReached ? "You reached the 40-minute limit — your architecture and critique are ready in the scorecard." : micStatus || (interviewEnded ? "The interview has ended — open your scorecard to review it." : isListening ? "Speak naturally — every word is captioned live below." : micPermission === "granted" ? "Tap to answer by voice — it transcribes on your device, free and offline after the first use." : "Voice needs one-time browser permission; tap the mic and allow it.")}</span>
           </div>
           {whisperModelState === "loading" && <p className="mic-status" style={{ color: "var(--muted)" }}>Preparing the offline speech model in the background… it&apos;ll be ready when you are.</p>}
           <div className="dock-controls">{interviewEnded ? <button className="text-link" onClick={() => setShowScorecard(true)}>View scorecard</button> : <button className="text-link" onClick={() => setShowEndConfirm(true)}>End interview</button>}</div>
-          {showScorecard && evaluationReport && <div className="transcript-modal" role="dialog" aria-modal="true" aria-label="Interview scorecard"><div className="transcript-card scorecard-modal-card"><section className="evaluation-card" aria-live="polite"><div className="eyebrow">Evidence-based review</div><strong className="evaluation-score">{evaluationReport.score}/100</strong><p className="evaluation-note">Half architecture health, half answer evidence. Levels use fixed anchors and quoted transcript excerpts, never personality or speaking style.</p><div className="scorecard-title-row"><strong>End-of-interview scorecard</strong><span>{evaluationReport.scorecard.answersAssessed} answers assessed</span></div><div className="scorecard-list">{evaluationReport.scorecard.competencies.map((item) => <div className="scorecard-row" key={item.id}><div className="scorecard-row-head"><strong>{item.name}</strong><span className={`level-chip ${item.level ? `level-${item.level}` : "level-unassessed"}`}>{item.level ? `${item.level} · ${item.label}` : "Not assessed"}</span><span className="scorecard-num">{item.score !== null ? `${item.score}/100` : "–"}</span></div><p className="scorecard-evidence">{item.evidence}</p>{item.quotes.map((quote, index) => <blockquote className="scorecard-quote" key={`${item.id}-${index}`}>&quot;{quote.text}&quot; <cite>{quote.phase}</cite></blockquote>)}</div>)}</div><p className="scorecard-summary">{evaluationReport.scorecard.overall.summary}</p><details className="level-scale"><summary>How levels are calibrated</summary><ol>{evaluationReport.scorecard.scale.map((level) => <li key={level.level}><strong>{level.level} · {level.label}</strong><span>{level.anchor}</span></li>)}</ol></details>{evaluationReport.improvements.length > 0 && <div className="evaluation-improvements"><strong>{evaluationReport.improvements.length > 1 ? "Next practice targets" : "Next practice target"}</strong><ul>{evaluationReport.improvements.slice(0, 3).map((item, index) => <li key={index}>{item}</li>)}</ul></div>}<button className="primary-button" style={{ marginTop: 14 }} onClick={() => void downloadTranscript()}>Download interview doc</button><button className="tool-button" style={{ marginTop: 8 }} onClick={() => setShowScorecard(false)}>Close</button></section></div></div>}
+          {showScorecard && evaluationReport && <div className="transcript-modal" role="dialog" aria-modal="true" aria-label="Interview scorecard"><div className="transcript-card scorecard-modal-card"><section className="evaluation-card" aria-live="polite"><div className="eyebrow">Evidence-based review</div><strong className="evaluation-score">{evaluationReport.score}/100</strong><p className="evaluation-note">Weighted evidence score: 70% answer evidence, 30% architecture health, scaled by how many design phases you actually addressed. Levels use fixed anchors and quoted transcript excerpts, never personality or speaking style.</p>{evaluationDiagram && <figure className="scorecard-diagram">{/* eslint-disable-next-line @next/next/no-img-element */}
+<img src={evaluationDiagram} alt={`Architecture diagram for ${scenarioName}`} />
+<figcaption>{scenarioName} · architecture at the end of the interview</figcaption></figure>}{evaluationReport.critique && <div className="critique-block"><div className="eyebrow">Staff-engineer critique</div><p className="critique-summary">{evaluationReport.critique.summary}</p>{evaluationReport.critique.strengths.length > 0 && <><strong className="critique-label">What held up</strong><ul>{evaluationReport.critique.strengths.map((item, index) => <li key={`strength-${index}`}>{item}</li>)}</ul></>}{evaluationReport.critique.improvements.length > 0 && <><strong className="critique-label">What to fix</strong><ul>{evaluationReport.critique.improvements.map((item, index) => <li key={`improve-${index}`}>{item}</li>)}</ul></>}</div>}<div className="scorecard-title-row"><strong>End-of-interview scorecard</strong><span>{evaluationReport.scorecard.answersAssessed} answers assessed</span></div><div className="scorecard-list">{evaluationReport.scorecard.competencies.map((item) => <div className="scorecard-row" key={item.id}><div className="scorecard-row-head"><strong>{item.name}</strong><span className={`level-chip ${item.level ? `level-${item.level}` : "level-unassessed"}`}>{item.level ? `${item.level} · ${item.label}` : "Not assessed"}</span><span className="scorecard-num">{item.score !== null ? `${item.score}/100` : "–"}</span></div><p className="scorecard-evidence">{item.evidence}</p>{item.quotes.map((quote, index) => <blockquote className="scorecard-quote" key={`${item.id}-${index}`}>&quot;{quote.text}&quot; <cite>{quote.phase}</cite></blockquote>)}</div>)}</div><p className="scorecard-summary">{evaluationReport.scorecard.overall.summary}</p><details className="level-scale"><summary>How levels are calibrated</summary><ol>{evaluationReport.scorecard.scale.map((level) => <li key={level.level}><strong>{level.level} · {level.label}</strong><span>{level.anchor}</span></li>)}</ol></details>{evaluationReport.improvements.length > 0 && <div className="evaluation-improvements"><strong>{evaluationReport.improvements.length > 1 ? "Next practice targets" : "Next practice target"}</strong><ul>{evaluationReport.improvements.slice(0, 3).map((item, index) => <li key={index}>{item}</li>)}</ul></div>}<button className="primary-button" style={{ marginTop: 14 }} onClick={() => void downloadTranscript()}>Download interview doc</button><button className="tool-button" style={{ marginTop: 8 }} onClick={() => setShowScorecard(false)}>Close</button></section></div></div>}
         </div>
       </aside>
       {showEndConfirm && <div className="transcript-modal" role="dialog" aria-modal="true" aria-label="End interview confirmation"><div className="transcript-card"><button className="popover-close" onClick={() => setShowEndConfirm(false)} aria-label="Close confirmation">×</button><div className="eyebrow">End interview</div><h2 style={{ margin: "8px 0 12px", fontSize: 24 }}>Ready to see your scorecard?</h2><p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.6, margin: "0 0 20px" }}>You&apos;ve answered {interviewState.answers.length} question{interviewState.answers.length === 1 ? "" : "s"} so far. Ending the interview will generate your final evaluation based on your architecture and answers.</p><div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><button className="tool-button" onClick={() => setShowEndConfirm(false)}>Keep practicing</button><button className="primary-button" onClick={endInterview}>End and evaluate ↗</button></div></div></div>}

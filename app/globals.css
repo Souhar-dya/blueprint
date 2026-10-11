@@ -391,6 +391,28 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
   .dock-controls .text-link { padding: 12px 18px; }
 }
 
+/* --- Interview countdown + end-of-interview review ------------------------
+   Visible remaining-time readout in the workspace nav, the architecture
+   diagram rendered into the scorecard, and the model-authored critique. */
+.interview-timer { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); font: 500 12px "DM Mono", monospace; letter-spacing: .04em; white-space: nowrap; }
+.interview-timer::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); }
+.interview-timer-low { color: var(--orange); border-color: #6b4a2a; }
+.interview-timer-low::before { background: var(--orange); }
+.interview-timer-done { color: var(--danger); border-color: #6b2f2f; }
+.interview-timer-done::before { background: var(--danger); }
+
+.scorecard-diagram { margin: 18px 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--canvas); }
+.scorecard-diagram img { display: block; width: 100%; height: auto; border-radius: 6px; }
+.scorecard-diagram figcaption { margin-top: 9px; color: var(--muted); font: 11px "DM Mono", monospace; text-align: center; }
+
+.critique-block { margin: 20px 0 4px; padding: 16px 18px; border: 1px solid #45664c; border-radius: 10px; background: linear-gradient(145deg, #1b3026, var(--panel)); }
+.critique-block .eyebrow { margin-bottom: 8px; }
+.critique-summary { margin: 0 0 14px; color: var(--ink); font-size: 14px; line-height: 1.65; }
+.critique-label { display: block; margin: 0 0 6px; color: var(--muted); font: 500 11px "DM Mono", monospace; letter-spacing: .08em; text-transform: uppercase; }
+.critique-block ul { margin: 0 0 14px; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.critique-block ul:last-child { margin-bottom: 0; }
+.critique-block li { margin-bottom: 5px; }
+
 /* --- Phones: tighten rhythm and stack rows that should not compete -------- */
 @media (max-width: 600px) {
   .nav { padding: 0 18px; }

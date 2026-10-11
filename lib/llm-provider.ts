@@ -1,9 +1,28 @@
 import type { InterviewContext, InterviewTurn } from "./interview";
 import { interviewPhases, isInterviewTurn, MAX_TURNS_PER_PHASE } from "./interview";
+import type { EvaluationCritique } from "./evaluation";
 
 export interface LLMProvider {
   generateInterviewTurn(context: InterviewContext): Promise<InterviewTurn>;
+  /**
+   * Staff-engineer closing criticism. Runs on the critique model (a smaller,
+   * faster model than the interviewer) and is deliberately separate from the
+   * deterministic score — it explains the result, it does not set it.
+   */
+  generateCritique(input: CritiqueInput): Promise<EvaluationCritique | null>;
 }
+
+/** Everything the critique model needs to write a specific, demanding review. */
+export type CritiqueInput = {
+  scenario: string;
+  score: number;
+  architecture: { nodes: string[]; connections: string[] };
+  validation: { score: number; findings: string[] };
+  competencies: Array<{ name: string; level: number | null; score: number | null }>;
+  answers: Array<{ phase?: string; answer?: string }>;
+  strengths: string[];
+  improvements: string[];
+};
 
 const fallbackTurn: InterviewTurn = {
   action: "transition_phase",
@@ -273,6 +292,20 @@ class MockLLMProvider implements LLMProvider {
       followUpType: "tradeoff",
     };
   }
+
+  async generateCritique(input: CritiqueInput): Promise<EvaluationCritique | null> {
+    const scored = input.competencies.filter((competency) => competency.score !== null);
+    const weakest = scored.slice().sort((a, b) => (a.score as number) - (b.score as number))[0];
+    const topFinding = input.validation.findings[0];
+    const summary = `Scored ${input.score}/100. ${topFinding || "The architecture passed the deterministic checks."}${
+      weakest ? ` The weakest evidence is ${weakest.name} at ${weakest.score}/100 — that is where the design is least defensible under pressure.` : ""
+    }${scored.length < input.competencies.length ? ` Only ${scored.length} of ${input.competencies.length} competencies had scored evidence, so parts of the interview went unassessed.` : ""}`;
+    return {
+      summary,
+      strengths: input.strengths.slice(0, 3),
+      improvements: input.improvements.slice(0, 4),
+    };
+  }
 }
 
 /**
@@ -360,6 +393,19 @@ Never inflate scores for length or confidence; reward specificity and judgment.
 
 Return ONLY valid JSON with EXACTLY these keys and no others: action (one of: acknowledge, follow_up, transition_phase, component_challenge, incident, evaluation), message (string: the complete conversational reply including the acknowledgment and the single question), question (string: just the question), reason (string: your reasoning for this turn), topic (string), nextPhase (optional string), difficultyAdjustment (exactly one of: increase, decrease, hold), followUpType (exactly one of: clarification, tradeoff, failure_mode, scale, incident), evaluation (object with numeric correctness, depth, tradeoffAwareness, each 0 to 1). nextPhase is the only key that may be absent.`;
 
+const CRITIC_SYSTEM_PROMPT = `You are a staff engineer writing the closing criticism of a finished system-design interview. You receive the candidate's architecture summary, deterministic validation findings, per-competency scores, and a digest of their answers.
+
+Write a demanding, specific critique of the engineering, never the person.
+
+Rules
+- Judge only what is on the canvas and in the answers. Never invent evidence and never reward effort, confidence, or speaking style.
+- Be concrete: name the missing failure mode, the unjustified technology choice, the absent number, or the trade-off that was never considered — and say what a stronger answer would have contained.
+- If the design is genuinely strong in an area, say so once, plainly, then move on.
+- Do not repeat the numeric scores back as the whole critique; interpret them.
+- The headline score is fixed and deterministic — explain it, do not restate it.
+
+Return ONLY valid JSON with EXACTLY these keys: summary (string: 2-4 sentences, the headline criticism), strengths (string[]: 0-3 specific things done well), improvements (string[]: 2-4 specific, actionable next steps).`;
+
 class OpenAICompatibleProvider implements LLMProvider {
   private readonly endpoint: string;
   private readonly apiKey: string;
@@ -439,13 +485,54 @@ class OpenAICompatibleProvider implements LLMProvider {
     if (!isInterviewTurn(parsed)) throw new Error("LLM provider returned an invalid interview turn");
     return parsed as InterviewTurn;
   }
+
+  async generateCritique(input: CritiqueInput): Promise<EvaluationCritique | null> {
+    // A model-authored critique is best-effort: on timeout, HTTP error, or
+    // malformed JSON the caller keeps the deterministic report unchanged.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 45000);
+    try {
+      const response = await fetch(`${this.endpoint}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.apiKey}` },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: this.model,
+          temperature: 0.2,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: CRITIC_SYSTEM_PROMPT },
+            { role: "user", content: JSON.stringify(input) },
+          ],
+        }),
+      });
+      if (!response.ok) return null;
+      const payload = await response.json() as { choices?: Array<{ message?: { content?: string; reasoning?: string } }> };
+      const rawContent = payload.choices?.[0]?.message?.content;
+      const content = rawContent && rawContent.trim() ? rawContent : payload.choices?.[0]?.message?.reasoning || "";
+      if (!content) return null;
+      const raw = JSON.parse(content) as Record<string, unknown>;
+      const summary = typeof raw.summary === "string" ? raw.summary.trim() : "";
+      if (!summary) return null;
+      const stringList = (value: unknown, max: number) =>
+        Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).slice(0, max) : [];
+      return {
+        summary,
+        strengths: stringList(raw.strengths, 3),
+        improvements: stringList(raw.improvements, 4),
+      };
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 }
 
-export function getLLMProvider(): LLMProvider {
+function providerFor(model: string): LLMProvider {
   const provider = process.env.LLM_PROVIDER || "mock";
   if (provider === "mock") return new MockLLMProvider();
   const endpoint = process.env.LLM_BASE_URL;
-  const model = process.env.LLM_MODEL;
   const apiKey = process.env.LLM_API_KEY || "";
   if (!model) throw new Error("LLM_MODEL is required for the configured provider");
   if (provider === "ollama") {
@@ -456,4 +543,17 @@ export function getLLMProvider(): LLMProvider {
   }
   if (!endpoint || !apiKey) throw new Error("LLM_BASE_URL and LLM_API_KEY are required for the configured provider");
   return new OpenAICompatibleProvider(endpoint, apiKey, model);
+}
+
+export function getLLMProvider(): LLMProvider {
+  return providerFor(process.env.LLM_MODEL || "");
+}
+
+/**
+ * The critique runs on its own model so the interviewer can use a large, slow
+ * model while the closing criticism uses a smaller, faster one. It falls back
+ * to the interviewer model when no critique model is configured.
+ */
+export function getCritiqueProvider(): LLMProvider {
+  return providerFor(process.env.LLM_CRITIQUE_MODEL || process.env.LLM_MODEL || "");
 }

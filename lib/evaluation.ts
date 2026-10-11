@@ -115,12 +115,25 @@ export type EvaluationScorecard = {
   };
 };
 
+/**
+ * Model-authored closing criticism. It never changes the deterministic score —
+ * it explains it, in a staff engineer's voice, and is attached by the
+ * evaluation route when the critique model is reachable.
+ */
+export type EvaluationCritique = {
+  summary: string;
+  strengths: string[];
+  improvements: string[];
+};
+
 export type EvaluationReport = {
   scenario: string;
   score: number;
   scorecard: EvaluationScorecard;
   strengths: string[];
   improvements: string[];
+  /** Present only when the critique model returned a usable response. */
+  critique?: EvaluationCritique | null;
   /** Legacy view kept for older clients: score is the 1..4 level, 0 when not assessed. */
   rubric: Array<{ competency: string; score: number; evidence: string }>;
   incident: {
@@ -332,6 +345,11 @@ export function buildScorecard(answers: readonly ScorecardAnswer[] = []): Evalua
   };
 }
 
+/** Clamp an arbitrary score into the 0..100 integer range used by the report. */
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
 export function buildEvaluationReport(input: {
   scenario: string;
   validation: ArchitectureValidation;
@@ -340,14 +358,21 @@ export function buildEvaluationReport(input: {
 }): EvaluationReport {
   const { validation } = input;
   const scorecard = buildScorecard(input.answers || []);
-  // Participation turns count substantive answers only; greetings and filler
-  // must not inflate the fallback headline score.
   const answers = input.answers || [];
-  const participationTurns = answers.length > 0 ? answers.filter((answer) => isSubstantiveAnswer(answer?.answer)).length : (input.turns || 0);
-  const conversationScore = Math.min(100, 50 + Math.min(30, participationTurns * 10) + (validation.valid ? 20 : 0));
+  // Coverage: how many design phases the candidate actually addressed with a
+  // substantive answer. Thin coverage cannot earn a high headline score.
+  const contentPhases = interviewPhases.filter((phase) => phase !== "final_evaluation");
+  const coveredPhases = new Set<string>(answers.filter((answer) => isSubstantiveAnswer(answer?.answer)).map((answer) => String(answer?.phase || "")));
+  const coverageRatio = contentPhases.length ? contentPhases.filter((phase) => coveredPhases.has(phase)).length / contentPhases.length : 0;
+  // Weighted evidence score: answer evidence leads and architecture health
+  // supports it, then a coverage gate scales the result down when large parts
+  // of the interview were never addressed. A bare diagram cannot pass on its
+  // own — there is deliberately no participation floor.
+  const EVIDENCE_WEIGHT = 0.7;
+  const ARCHITECTURE_WEIGHT = 0.3;
   const score = scorecard.overall.score !== null
-    ? Math.round((validation.score + scorecard.overall.score) / 2)
-    : Math.round((validation.score + conversationScore) / 2);
+    ? clampScore(Math.round((scorecard.overall.score * EVIDENCE_WEIGHT + validation.score * ARCHITECTURE_WEIGHT) * (0.6 + 0.4 * coverageRatio)))
+    : clampScore(Math.round(validation.score * 0.4));
 
   const strengths = validation.valid
     ? ["Clear component boundaries", "Architecture passes deterministic checks"]
@@ -356,9 +381,6 @@ export function buildEvaluationReport(input: {
     if (strengths.length >= 4) break;
     if (competency.level === 4 || competency.level === 3) strengths.push(`Strongest signal: ${competency.name} (${competency.label}).`);
   }
-  const contentPhases = interviewPhases.filter((phase) => phase !== "final_evaluation");
-  const coveredPhases = new Set<string>(answers.filter((answer) => isSubstantiveAnswer(answer?.answer)).map((answer) => String(answer?.phase || "")));
-  const coverageRatio = contentPhases.length ? contentPhases.filter((phase) => coveredPhases.has(phase)).length / contentPhases.length : 0;
   if (strengths.length < 4 && coverageRatio >= 0.5) {
     strengths.push(`Broad coverage: you answered into ${coveredPhases.size} of ${contentPhases.length} design phases.`);
   }

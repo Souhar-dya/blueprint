@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getLLMProvider, type LLMProvider } from "../lib/llm-provider";
+import { getLLMProvider, getCritiqueProvider, type LLMProvider } from "../lib/llm-provider";
 import { createInterviewState, buildInterviewContext } from "../lib/interview";
 import type { ArchitectureState } from "../lib/architecture";
 
-const envKeys = ["LLM_PROVIDER", "LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL"] as const;
+const envKeys = ["LLM_PROVIDER", "LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL", "LLM_CRITIQUE_MODEL"] as const;
 let originalEnv: Record<string, string | undefined>;
 
 afterEach(() => {
@@ -114,5 +114,39 @@ describe("MockLLMProvider", () => {
     const turn = await provider.generateInterviewTurn(context);
     expect(turn.topic).toBe("high_level_architecture");
     expect(turn.message).toContain("broken critical path");
+  });
+});
+
+describe("getCritiqueProvider", () => {
+  captureEnv();
+
+  it("falls back to the interviewer model when no critique model is configured", () => {
+    process.env.LLM_PROVIDER = "ollama";
+    process.env.LLM_MODEL = "gpt-oss:120b";
+    delete process.env.LLM_CRITIQUE_MODEL;
+    expect(() => getCritiqueProvider()).not.toThrow();
+  });
+
+  it("writes a model-authored critique in mock mode", async () => {
+    delete process.env.LLM_PROVIDER;
+    const provider = getCritiqueProvider();
+    const critique = await provider.generateCritique({
+      scenario: "Design YouTube",
+      score: 42,
+      architecture: { nodes: ["Web Client", "API Server"], connections: ["Web Client -> API Server"] },
+      validation: { score: 90, findings: ["warning: single-database — only one store"] },
+      competencies: [
+        { name: "Problem framing", level: 3, score: 90 },
+        { name: "Data and interfaces", level: 1, score: 20 },
+      ],
+      answers: [{ phase: "requirements", answer: "Short links dominate because reads outnumber writes." }],
+      strengths: ["Clear component boundaries"],
+      improvements: ["Justify the storage choice"],
+    });
+    expect(critique).not.toBeNull();
+    expect(critique?.summary).toContain("42/100");
+    expect(critique?.summary).toContain("Data and interfaces");
+    expect(critique?.strengths).toContain("Clear component boundaries");
+    expect(critique?.improvements).toContain("Justify the storage choice");
   });
 });
