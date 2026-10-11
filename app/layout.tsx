@@ -32,6 +32,11 @@ export const metadata: Metadata = {
     description: "An adaptive system design interview simulator for engineers.",
   },
   robots: { index: true, follow: true },
+  verification: {
+    other: {
+      "strix-verification": "strix-verify-3c049a47e260194e34e40b00142fabac",
+    },
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
